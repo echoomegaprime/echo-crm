@@ -1,0 +1,37 @@
+{
+  "service": "echo-crm",
+  "description": "Secrets for echo-crm security pass. Prefer vault service=echo-crm; env overrides via EnvironmentFile.",
+  "keys": [
+    {
+      "vault_key": "PGPASSWORD",
+      "env": ["ECHO_CRM_PG_PASSWORD", "PGPASSWORD"],
+      "required": true,
+      "purpose": "Postgres password for CRM schema. No hardcoded default."
+    },
+    {
+      "vault_key": "ECHO_CRM_API_KEY",
+      "env": ["ECHO_CRM_API_KEY", "ECHO_API_KEY", "SOVEREIGN_KEY"],
+      "required": true,
+      "purpose": "API authentication key (X-Echo-API-Key). Timing-safe compare via security.secure_compare."
+    },
+    {
+      "vault_key": "STRIPE_SECRET_KEY",
+      "env": ["ECHO_CRM_STRIPE_SECRET_KEY", "STRIPE_SECRET_KEY"],
+      "required": false,
+      "purpose": "Stripe secret for plan upgrade checkout sessions."
+    },
+    {
+      "vault_key": "STRIPE_WEBHOOK_SECRET",
+      "env": ["ECHO_CRM_STRIPE_WEBHOOK_SECRET", "STRIPE_WEBHOOK_SECRET"],
+      "required": false,
+      "purpose": "Stripe webhook HMAC secret (v1 scheme). Required for /webhooks/stripe in production."
+    }
+  ],
+  "api_key_env": ["ECHO_CRM_API_KEY", "ECHO_API_KEY", "SOVEREIGN_KEY"],
+  "api_key_files": ["/home/forge/.echo_sovereign_key"],
+  "notes": [
+    "Do not commit secrets. Unit file uses EnvironmentFile=-/etc/echo/echo-crm.env (and siblings).",
+    "Dev-only: ECHO_CRM_DEV_MODE=1 allows missing API key / local defaults for tests — never set in production systemd.",
+    "Hardcoded PGPASSWORD=echo removed from source and unit; vault first, then env."
+  ]
+}

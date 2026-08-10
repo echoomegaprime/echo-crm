@@ -5,7 +5,48 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
-### Security
+### Merged the production Python runtime
+
+- Brought in the FastAPI service (`app.py` + `security.py`/`resilience.py`/`metrics.py`/
+  `logging_config.py`, 5,639 lines total) from the live FORGE deployment
+  (`echo-crm.service`, port 8142) as the **authoritative production runtime** -- the
+  Cloudflare Worker (`src/index.ts`) is now documented as a legacy reference implementation,
+  matching the pattern already established for `echo-invoice`/`echo-live-chat`/
+  `echo-compliance-auditor`. See README.md for the two runtimes' endpoint tables -- their
+  public/authenticated boundaries are **not identical** (the Python service requires a key for
+  `/status` and `/plans`; the Worker treats both as public) and this is documented rather than
+  silently reconciled.
+- Verified a real baseline before touching anything: ran the existing Python suite (`tests/` +
+  `test_security.py` + `test_observability.py`, 88 tests) both on the live FORGE deployment and
+  against this repo's copy of the same files from a clean venv, connected to the real FORGE
+  Postgres from a separate machine -- 87/88 passed both times, confirming the merge preserved
+  the exact tested behavior.
+- Fixed the one real test-drift issue found: `test_version_security_tag` asserted
+  `CRM_VERSION.endswith("-security")` and `"2.1.0" in CRM_VERSION`, but the real, current,
+  intentional version is `2.2.0-resilience` (a later resilience pass layered on the same
+  hardened baseline, confirmed via the live systemd unit's `ECHO_CRM_VERSION` env var, not a
+  regression). Broadened the assertion to accept either hardening-pass suffix instead of pinning
+  to a value that goes stale on every future pass.
+- Added `requirements.txt`/`requirements-dev.txt` (constructed from a real `ast`-based import
+  scan of every core module, not guessed: `fastapi`, `uvicorn[standard]`, `psycopg2-binary`,
+  `pydantic`, `minio`, `prometheus-client`, plus `pytest`/`httpx` for the dev suite -- `httpx`
+  was missing initially and caused a real collection error, `starlette.testclient` requires it).
+- Added `PYTHON_RUNTIME.md` (install/verify/deploy-gate instructions for the Python side).
+- Extended `certforge_journey.py` to validate both runtimes: real `ast.parse` syntax validation
+  for every Python module (the sandbox has no Node, so the Worker side still uses the
+  bracket-count heuristic, but Python gets genuine parsing since the sandbox IS bare Python),
+  plus a new regression guard on `security.py`'s `ENDPOINT_AUTH` map -- fails if any endpoint
+  beyond `root`/`health`/`ready`/`resilience` is marked `AUTH_PUBLIC`, since the Python
+  service's public surface is deliberately narrower than the Worker's and a silent widening
+  there would be a real regression. Verified locally by deliberately marking `/status` public
+  and confirming the journey fails, then restoring.
+- Extended hosted CI with a `python` job (Postgres 16 service container, real integration
+  tests) alongside the existing `worker` job.
+- Merged `SECURITY.md` to document both runtimes' security models side by side (the Python
+  service's five-tier authorization, vault-backed secret resolution order, and constant-time
+  comparison; the Worker's `PUBLIC_PATHS` allowlist and its prior GET-exemption vulnerability).
+
+### Security (Worker, prior to the Python merge)
 
 - **Fixed a serious data-exposure defect**: the auth middleware exempted every
   `GET`/`HEAD`/`OPTIONS` request from authentication regardless of path. This left the entire

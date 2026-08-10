@@ -34,9 +34,10 @@
     "echo.crm.plans",
     "echo.crm.plans.upgrade",
     "echo.crm.admin.migrate_stripe",
-    "echo.crm.webhooks.stripe"
+    "echo.crm.webhooks.stripe",
+    "echo.crm.internal.weekly_digest"
   ],
-  "note": "arcanum_sdk.sdk_capabilities also has echo.crm.sync.{health,plan,pull,push,status}, echo.crm.leads.triage, and echo.crm.internal.weekly_digest registered, but no matching route exists in this repository's src/index.ts (routes enumerated by grep of every app.get/post/put/delete call) -- those 7 belong to a different service and are not claimed here.",
+  "note": "arcanum_sdk.sdk_capabilities also has echo.crm.sync.{health,plan,pull,push,status} and echo.crm.leads.triage registered, but no matching route exists in either runtime in this repository (checked both src/index.ts and the Python app.py/security.py resolve_endpoint map) -- those 6 belong to a different service and are not claimed here. echo.crm.internal.weekly_digest WAS added after merging the Python service, which implements POST /internal/cron/weekly-digest (the Worker does not).",
   "entrypoints": ["scripts/certforge_journey.py"],
   "data_classification": "restricted",
   "network": "stripe"

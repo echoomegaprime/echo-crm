@@ -1,0 +1,38 @@
+[Unit]
+Description=Echo CRM — FORGE migration of the legacy CF echo-crm worker (AI-powered deals, contacts, lead scoring, Stripe)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=forge
+WorkingDirectory=/home/forge/echo-crm
+Environment=PYTHONUNBUFFERED=1
+Environment=PGHOST=127.0.0.1
+Environment=PGUSER=echo
+Environment=PGDATABASE=echo
+Environment=ECHO_CRM_VERSION=2.2.0-resilience
+# Resilience: stay up when Postgres/MinIO/gate are down; queue writes; probe deps
+Environment=CRM_FAIL_OPEN=1
+Environment=CRM_STATE_DIR=/home/forge/.cache/echo-crm
+Environment=SDK_GATE_URL=http://127.0.0.1:8000
+# Secrets: vault service=echo-crm first, then EnvironmentFile (never hardcode PGPASSWORD/API keys here)
+# EnvironmentFile supplies PGPASSWORD / ECHO_CRM_PG_PASSWORD / ECHO_CRM_API_KEY / Stripe keys
+EnvironmentFile=-/etc/echo/echo-crm.env
+EnvironmentFile=-/etc/systemd/system/echo-crm.service.d/secrets.env
+# Optional AI / brain integrations (best-effort)
+# Environment=ECHO_ENGINE_RUNTIME_URL=http://127.0.0.1:809x/query
+# Environment=ECHO_SHARED_BRAIN_URL=http://127.0.0.1:80xx/ingest
+# Optional MinIO archival (exports / receipts)
+# Environment=MINIO_ENDPOINT=
+StandardInput=null
+ExecStart=/usr/bin/python3 -m uvicorn app:app --host 0.0.0.0 --port 8142 --log-level info
+Restart=on-failure
+RestartSec=5
+MemoryMax=1G
+
+Slice=echo-fleet.slice
+MemoryHigh=819M
+EnvironmentFile=-/var/run/echo/discovery_mesh/mesh.env
+[Install]
+WantedBy=multi-user.target

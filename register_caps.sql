@@ -1,0 +1,167 @@
+-- Echo CRM — SDK caps (echo.crm.*) -> FORGE service :8142.
+-- Run: PGPASSWORD=echo psql -h localhost -U echo -d echo -f register_caps.sql
+-- Tier: 0=public/read, 1=normal mutate, 2=admin/value-grant (per prompt spec)
+-- Replaces legacy CF worker routes 1:1. Original read-only at /mnt/cf_kv_r2/workers/echo-crm
+INSERT INTO arcanum_sdk.sdk_capabilities
+  (id, description, handler_kind, target_url, target_method, args_mode, target_node,
+   input_schema_json, required_scope, rate_cost, danger_tier, schema_version,
+   is_builtin, lifecycle_status, health_status, created_at, updated_at)
+VALUES
+  -- Health / status (tier 0)
+  ('echo.crm.health','Echo CRM: liveness + DB check.',
+   'http','http://127.0.0.1:8142/health','GET','query','forge',
+   '{"type":"object","properties":{}}','tier:0',1,0,1,false,'active','unknown',now(),now()),
+  ('echo.crm.status','Echo CRM: high-level counts (contacts, open deals, pipelines).',
+   'http','http://127.0.0.1:8142/status','GET','query','forge',
+   '{"type":"object","properties":{}}','tier:0',1,0,1,false,'active','unknown',now(),now()),
+
+  -- Pipelines (tier 1 for mutate)
+  ('echo.crm.pipelines.list','Echo CRM: list all pipelines.',
+   'http','http://127.0.0.1:8142/pipelines','GET','query','forge',
+   '{"type":"object","properties":{}}','tier:0',1,0,1,false,'active','unknown',now(),now()),
+  ('echo.crm.pipelines.create','Echo CRM: create pipeline + default stages.',
+   'http','http://127.0.0.1:8142/pipelines','POST','json_body','forge',
+   '{"type":"object","required":["name"],"properties":{"name":{"type":"string"},"is_default":{"type":"boolean"}}}',
+   'tier:1',1,1,1,false,'active','unknown',now(),now()),
+  ('echo.crm.pipelines.get','Echo CRM: get pipeline + its stages.',
+   'http','http://127.0.0.1:8142/pipelines/{pid}','GET','query','forge',
+   '{"type":"object","required":["pid"],"properties":{"pid":{"type":"string"}}}',
+   'tier:0',1,0,1,false,'active','unknown',now(),now()),
+  ('echo.crm.pipelines.delete','Echo CRM: delete pipeline.',
+   'http','http://127.0.0.1:8142/pipelines/{pid}','DELETE','query','forge',
+   '{"type":"object","required":["pid"],"properties":{"pid":{"type":"string"}}}',
+   'tier:2',1,2,1,false,'active','unknown',now(),now()),
+
+  -- Contacts (core CRM, tier 1 normal, deletes tier 2)
+  ('echo.crm.contacts.list','Echo CRM: list/search contacts (q, status, source, pagination).',
+   'http','http://127.0.0.1:8142/contacts','GET','query','forge',
+   '{"type":"object","properties":{"q":{"type":"string"},"status":{"type":"string"},"source":{"type":"string"},"limit":{"type":"integer"},"offset":{"type":"integer"}}}',
+   'tier:0',1,0,1,false,'active','unknown',now(),now()),
+  ('echo.crm.contacts.create','Echo CRM: create contact.',
+   'http','http://127.0.0.1:8142/contacts','POST','json_body','forge',
+   '{"type":"object","required":["first_name"],"properties":{"first_name":{"type":"string"},"last_name":{"type":"string"},"email":{"type":"string"},"company_id":{"type":"string"},"lead_status":{"type":"string"}}}',
+   'tier:1',1,1,1,false,'active','unknown',now(),now()),
+  ('echo.crm.contacts.get','Echo CRM: get contact + recent deals/activities.',
+   'http','http://127.0.0.1:8142/contacts/{cid}','GET','query','forge',
+   '{"type":"object","required":["cid"],"properties":{"cid":{"type":"string"}}}',
+   'tier:0',1,0,1,false,'active','unknown',now(),now()),
+  ('echo.crm.contacts.update','Echo CRM: update contact.',
+   'http','http://127.0.0.1:8142/contacts/{cid}','PUT','json_body','forge',
+   '{"type":"object","required":["cid"],"properties":{"cid":{"type":"string"},"first_name":{"type":"string"},"lead_status":{"type":"string"}}}',
+   'tier:1',1,1,1,false,'active','unknown',now(),now()),
+  ('echo.crm.contacts.delete','Echo CRM: delete contact (tier-2).',
+   'http','http://127.0.0.1:8142/contacts/{cid}','DELETE','query','forge',
+   '{"type":"object","required":["cid"],"properties":{"cid":{"type":"string"}}}',
+   'tier:2',1,2,1,false,'active','unknown',now(),now()),
+
+  -- Companies
+  ('echo.crm.companies.list','Echo CRM: list/search companies.',
+   'http','http://127.0.0.1:8142/companies','GET','query','forge',
+   '{"type":"object","properties":{"q":{"type":"string"},"limit":{"type":"integer"}}}',
+   'tier:0',1,0,1,false,'active','unknown',now(),now()),
+  ('echo.crm.companies.create','Echo CRM: create company.',
+   'http','http://127.0.0.1:8142/companies','POST','json_body','forge',
+   '{"type":"object","required":["name"],"properties":{"name":{"type":"string"},"domain":{"type":"string"}}}',
+   'tier:1',1,1,1,false,'active','unknown',now(),now()),
+  ('echo.crm.companies.get','Echo CRM: get company.',
+   'http','http://127.0.0.1:8142/companies/{cid}','GET','query','forge',
+   '{"type":"object","required":["cid"],"properties":{"cid":{"type":"string"}}}',
+   'tier:0',1,0,1,false,'active','unknown',now(),now()),
+  ('echo.crm.companies.delete','Echo CRM: delete company (tier-2).',
+   'http','http://127.0.0.1:8142/companies/{cid}','DELETE','query','forge',
+   '{"type":"object","required":["cid"],"properties":{"cid":{"type":"string"}}}',
+   'tier:2',1,2,1,false,'active','unknown',now(),now()),
+
+  -- Deals + board + move (value ops tier-1/2)
+  ('echo.crm.deals.list','Echo CRM: list deals (filter by pipeline/stage/status).',
+   'http','http://127.0.0.1:8142/deals','GET','query','forge',
+   '{"type":"object","properties":{"pipeline_id":{"type":"string"},"stage_id":{"type":"string"},"status":{"type":"string"}}}',
+   'tier:0',1,0,1,false,'active','unknown',now(),now()),
+  ('echo.crm.deals.board','Echo CRM: pipeline board view (stages + counts + values).',
+   'http','http://127.0.0.1:8142/deals/board','GET','query','forge',
+   '{"type":"object","properties":{"pipeline_id":{"type":"string"}}}',
+   'tier:0',1,0,1,false,'active','unknown',now(),now()),
+  ('echo.crm.deals.create','Echo CRM: create deal.',
+   'http','http://127.0.0.1:8142/deals','POST','json_body','forge',
+   '{"type":"object","required":["title","pipeline_id","stage_id"],"properties":{"title":{"type":"string"},"pipeline_id":{"type":"string"},"stage_id":{"type":"string"},"value":{"type":"number"}}}',
+   'tier:1',1,1,1,false,'active','unknown',now(),now()),
+  ('echo.crm.deals.move','Echo CRM: move deal to new stage (updates probability).',
+   'http','http://127.0.0.1:8142/deals/{did}/move','POST','json_body','forge',
+   '{"type":"object","required":["did","stage_id"],"properties":{"did":{"type":"string"},"stage_id":{"type":"string"}}}',
+   'tier:1',1,1,1,false,'active','unknown',now(),now()),
+  ('echo.crm.deals.delete','Echo CRM: delete deal (tier-2 value op).',
+   'http','http://127.0.0.1:8142/deals/{did}','DELETE','query','forge',
+   '{"type":"object","required":["did"],"properties":{"did":{"type":"string"}}}',
+   'tier:2',1,2,1,false,'active','unknown',now(),now()),
+
+  -- Lead scoring (AI + rules, tier 1/2 for admin rules)
+  ('echo.crm.lead_scoring.score','Echo CRM: (re)score a contact (rules + AI engine boost).',
+   'http','http://127.0.0.1:8142/lead-scoring/score','POST','json_body','forge',
+   '{"type":"object","required":["contact_id"],"properties":{"contact_id":{"type":"string"}}}',
+   'tier:1',1,1,1,false,'active','unknown',now(),now()),
+  ('echo.crm.lead_scoring.rules.list','Echo CRM: active lead scoring rules.',
+   'http','http://127.0.0.1:8142/lead-scoring/rules','GET','query','forge',
+   '{"type":"object","properties":{}}','tier:0',1,0,1,false,'active','unknown',now(),now()),
+  ('echo.crm.lead_scoring.rules.create','Echo CRM: add lead scoring rule (admin).',
+   'http','http://127.0.0.1:8142/lead-scoring/rules','POST','json_body','forge',
+   '{"type":"object","required":["field","operator","value","score"],"properties":{"field":{"type":"string"},"operator":{"type":"string"},"value":{"type":"string"},"score":{"type":"integer"}}}',
+   'tier:2',1,2,1,false,'active','unknown',now(),now()),
+
+  -- Analytics (tier 0)
+  ('echo.crm.analytics.pipeline','Echo CRM: pipeline analytics (values, weighted).',
+   'http','http://127.0.0.1:8142/analytics/pipeline','GET','query','forge',
+   '{"type":"object","required":["pipeline_id"],"properties":{"pipeline_id":{"type":"string"}}}',
+   'tier:0',1,0,1,false,'active','unknown',now(),now()),
+  ('echo.crm.analytics.contacts','Echo CRM: contact analytics.',
+   'http','http://127.0.0.1:8142/analytics/contacts','GET','query','forge',
+   '{"type":"object","properties":{}}','tier:0',1,0,1,false,'active','unknown',now(),now()),
+  ('echo.crm.analytics.revenue','Echo CRM: revenue analytics (won deals).',
+   'http','http://127.0.0.1:8142/analytics/revenue','GET','query','forge',
+   '{"type":"object","properties":{}}','tier:0',1,0,1,false,'active','unknown',now(),now()),
+
+  -- Import / Export / Plans / Stripe (import tier1, admin/stripe tier2)
+  ('echo.crm.import.contacts','Echo CRM: bulk import contacts (json array, max 500).',
+   'http','http://127.0.0.1:8142/import/contacts','POST','json_body','forge',
+   '{"type":"object","required":["contacts"],"properties":{"contacts":{"type":"array"}}}',
+   'tier:1',1,1,1,false,'active','unknown',now(),now()),
+  ('echo.crm.export.contacts','Echo CRM: export contacts (json, 5000 max).',
+   'http','http://127.0.0.1:8142/export/contacts','GET','query','forge',
+   '{"type":"object","properties":{}}','tier:0',1,0,1,false,'active','unknown',now(),now()),
+  ('echo.crm.plans','Echo CRM: subscription plans.',
+   'http','http://127.0.0.1:8142/plans','GET','query','forge',
+   '{"type":"object","properties":{}}','tier:0',1,0,1,false,'active','unknown',now(),now()),
+  ('echo.crm.plans.upgrade','Echo CRM: create Stripe checkout for plan upgrade.',
+   'http','http://127.0.0.1:8142/plans/upgrade','POST','json_body','forge',
+   '{"type":"object","required":["tenant_id","plan_id"],"properties":{"tenant_id":{"type":"string"},"plan_id":{"type":"string"}}}',
+   'tier:2',1,2,1,false,'active','unknown',now(),now()),
+  ('echo.crm.webhooks.stripe','Echo CRM: Stripe webhook (signature verified).',
+   'http','http://127.0.0.1:8142/webhooks/stripe','POST','raw_body','forge',
+   '{"type":"object","properties":{}}','tier:2',1,2,1,false,'active','unknown',now(),now()),
+  ('echo.crm.admin.migrate_stripe','Echo CRM: ensure tenants table (one-time).',
+   'http','http://127.0.0.1:8142/admin/migrate-stripe','POST','json_body','forge',
+   '{"type":"object","properties":{}}','tier:2',1,2,1,false,'active','unknown',now(),now()),
+
+  -- Activity log (audit)
+  ('echo.crm.activity_log','Echo CRM: recent activity log (entity filtered).',
+   'http','http://127.0.0.1:8142/activity-log','GET','query','forge',
+   '{"type":"object","properties":{"entity_type":{"type":"string"},"entity_id":{"type":"string"},"limit":{"type":"integer"}}}',
+   'tier:1',1,1,1,false,'active','unknown',now(),now()),
+
+  -- Internal cron (tier 2)
+  ('echo.crm.internal.weekly_digest','Echo CRM: run weekly pipeline digest (ingests to Shared Brain).',
+   'http','http://127.0.0.1:8142/internal/cron/weekly-digest','POST','json_body','forge',
+   '{"type":"object","properties":{}}','tier:2',1,2,1,false,'active','unknown',now(),now())
+ON CONFLICT (id) DO UPDATE SET
+  target_url=EXCLUDED.target_url,
+  handler_kind=EXCLUDED.handler_kind,
+  target_method=EXCLUDED.target_method,
+  args_mode=EXCLUDED.args_mode,
+  input_schema_json=EXCLUDED.input_schema_json,
+  description=EXCLUDED.description,
+  required_scope=EXCLUDED.required_scope,
+  danger_tier=EXCLUDED.danger_tier,
+  lifecycle_status='active',
+  updated_at=now();
+
+-- Verify
+SELECT id, danger_tier FROM arcanum_sdk.sdk_capabilities WHERE id LIKE 'echo.crm.%' ORDER BY id;
