@@ -1,15 +1,24 @@
 {
   "name": "echo-crm",
-  "version": "1.0.0",
-  "main": "index.js",
+  "version": "2.0.0",
+  "private": true,
+  "license": "SEE LICENSE IN LICENSE",
+  "type": "module",
+  "main": "src/index.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "tsc --noEmit && node --test tests/*.test.mjs"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
-  "description": "",
+  "description": "Echo CRM -- contacts, companies, deals, pipelines, and revenue analytics on Cloudflare Workers.",
   "dependencies": {
-    "hono": "^4.12.9"
+    "hono": "^4.13.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260804.1",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.76.0"
   }
 }

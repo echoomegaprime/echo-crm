@@ -135,7 +135,7 @@ async function logActivity(db: D1Database, entityType: string, entityId: string,
 
 // ── App ──────────────────────────────────────────────────────────
 
-const app = new Hono<{ Bindings: Env }>();
+export const app = new Hono<{ Bindings: Env }>();
 
 // Security headers middleware
 app.use('*', async (c, next) => {
@@ -174,15 +174,39 @@ app.use('*', async (c, next) => {
   return next();
 });
 
-// ── Auth Middleware — writes require API key ─────────────────────
+// ── Auth Middleware — only these exact routes are public ─────────────
+// Every other route (including every GET) requires auth. The previous
+// version exempted every GET/HEAD/OPTIONS request regardless of path,
+// which left the entire CRM read surface -- contacts, companies, deals,
+// revenue analytics, and a bulk /export/contacts dump -- unauthenticated
+// on the public internet. That is real customer PII and financial data,
+// not the kind of thing that should ever be publicly readable by design.
+const PUBLIC_PATHS = new Set(['/', '/health', '/status', '/plans', '/webhooks/stripe']);
+
+export function timingSafeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const bufA = enc.encode(a);
+  const bufB = enc.encode(b);
+  const len = Math.max(bufA.length, bufB.length, 1);
+  const padA = new Uint8Array(len);
+  const padB = new Uint8Array(len);
+  padA.set(bufA);
+  padB.set(bufB);
+  let diff = bufA.length ^ bufB.length;
+  for (let i = 0; i < len; i++) diff |= padA[i] ^ padB[i];
+  return diff === 0;
+}
+
 app.use('*', async (c, next) => {
   const method = c.req.method;
   const path = new URL(c.req.url).pathname;
-  if (method === 'GET' || method === 'OPTIONS' || method === 'HEAD' || path === '/health' || path === '/status' || path === '/webhooks/stripe') return next();
+  if (method === 'OPTIONS' || PUBLIC_PATHS.has(path)) return next();
   const apiKey = c.req.header('X-Echo-API-Key') || '';
   const bearer = (c.req.header('Authorization') || '').replace('Bearer ', '');
   const expected = c.env.ECHO_API_KEY;
-  if (!expected || (apiKey !== expected && bearer !== expected)) {
+  const apiKeyOk = !!apiKey && !!expected && timingSafeEqual(apiKey, expected);
+  const bearerOk = !!bearer && !!expected && timingSafeEqual(bearer, expected);
+  if (!expected || (!apiKeyOk && !bearerOk)) {
     return c.json({ ok: false, error: 'Unauthorized — X-Echo-API-Key or Bearer token required' }, 401);
   }
   return next();
