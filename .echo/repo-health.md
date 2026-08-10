@@ -2,15 +2,12 @@
 
 Source repository: `echoomegaprime/echo-crm`
 
-Source commit: `3079d9052adba240b350f095e2329ad95729f744`
+Source commit: `4ba6112e20f06c51efaf4d852c0644ea3f7627c9`
 
-Filed manually (2026-08-10): the same shared-framework App bug affecting other repos this
-campaign (build #29466) also hit this repo's push webhook. Cert Forge certification was obtained
-directly via `echo.certforge.submit` (cert_57190cb4ba8cd555aafd8a84c7411de954a4205f,
-PRODUCTION_READY, confirmed directly from the signed verdict payload on FORGE after the
-`echo.certforge.status` read path also hit a transient capability-resolution issue -- see
-build #29473). This receipt reproduces the identical showroom-floor audit the App would post,
-verified by direct `git ls-tree` on the exact commit.
+Updated manually after the Python runtime merge (2026-08-10). The GitHub App suite that would
+post this automatically is affected by build #29466. Cert Forge PRODUCTION_READY was obtained
+directly via `echo.certforge.submit` (cert_57dcc9be9455e736081197f5a10bb658efca2087), confirmed
+via the signed verdict payload on FORGE.
 
 ## Showroom floor audit
 
