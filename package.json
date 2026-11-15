@@ -14,7 +14,7 @@
   "author": "",
   "description": "Echo CRM -- contacts, companies, deals, pipelines, and revenue analytics on Cloudflare Workers.",
   "dependencies": {
-    "hono": "^4.13.1"
+    "hono": "^4.13.5"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260804.1",
